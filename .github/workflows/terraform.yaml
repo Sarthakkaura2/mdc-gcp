@@ -1,4 +1,4 @@
-name: Deploy GCP Security Connector
+name: Deploy GCP Security Connector with Terraform
 
 on:
   workflow_dispatch:
@@ -13,6 +13,63 @@ jobs:
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+
+    - name: Create main.tf file
+      run: |
+        cat > main.tf << 'EOF'
+        terraform {
+          required_providers {
+            azurerm = {
+              source  = "hashicorp/azurerm"
+              version = "~> 3.0"
+            }
+          }
+        }
+
+        provider "azurerm" {
+          features {}
+          subscription_id = "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
+          client_id       = "d47fb118-5c46-4069-801d-a7c945665e0f"
+          client_secret   = "NkG8Q~.FzKAZCNttyqvHxAwaeero5ciRepXKDa6Z"
+          tenant_id       = "1172494f-68e2-4743-8ebb-b6916a1c681e"
+        }
+
+        resource "azurerm_security_center_connector" "gcp_connector" {
+          name                = "gcp-poc-connector"
+          resource_group_name = "kpmg-testing"
+          location            = "eastus"
+          hierarchy_identifier = "93604753456"
+          environment_name    = "GCP"
+          
+          organizational_data {
+            organization_membership_type = "Organization"
+            organization_id              = "1044632980853"
+            workload_identity_pool_id    = "1172494f68e247438ebbb6916a1c681e"
+          }
+
+          offering {
+            offering_type = "CspmMonitorGcp"
+            
+            native_cloud_connection {
+              workload_identity_provider_id = "cspm"
+              service_account_email_address = "microsoft-defender-cspm@gcp-containers-dso-prod-189401.iam.gserviceaccount.com"
+            }
+          }
+        }
+
+        output "connector_id" {
+          value = azurerm_security_center_connector.gcp_connector.id
+        }
+
+        output "connector_status" {
+          value = azurerm_security_center_connector.gcp_connector.provisioning_state
+        }
+        EOF
+
+        # Show the created file
+        cat main.tf
 
     - name: Terraform Init
       run: terraform init
@@ -21,10 +78,10 @@ jobs:
       run: terraform validate
 
     - name: Terraform Plan
-      run: terraform plan
+      run: terraform plan -out=tfplan
 
     - name: Terraform Apply
-      run: terraform apply -auto-approve
+      run: terraform apply -auto-approve tfplan
 
-    - name: Show Outputs
+    - name: Show Terraform Outputs
       run: terraform output
