@@ -1,10 +1,6 @@
 <#
 .SYNOPSIS
     PowerShell Script to Onboard a GCP Folder to Microsoft Defender for Cloud
-
-.DESCRIPTION
-    This script automates the process of creating a security connector for a GCP folder,
-    enabling Microsoft Defender for Cloud to monitor resources within that folder.
 #>
 
 [CmdletBinding()]
@@ -32,6 +28,9 @@ param(
 
     [Parameter(Mandatory=$true)]
     [string]$WorkloadPoolId,
+
+    [Parameter(Mandatory=$true)]
+    [string]$GCPOrganizationId,
 
     [string]$AzureLocation = "eastus",
 
@@ -171,12 +170,11 @@ $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroup
 $bodyObj = @{
     location = $AzureLocation
     properties = @{
-        hierarchyIdentifier = $GCPFolderId  # Just the folder ID, not "folders/" prefix
+        hierarchyIdentifier = "folders/$GCPFolderId"  # Use the correct format with "folders/" prefix
         environmentName = "GCP"
         environmentData = @{
             organizationalData = @{
-                organizationMembershipType = "Member"
-                managementProjectNumber = $GCPManagementProjectId
+                organizationMembershipType = "Organization"
                 organizationId = $GCPOrganizationId
                 workloadIdentityPoolId = $WorkloadPoolId
             }
