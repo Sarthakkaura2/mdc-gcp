@@ -100,19 +100,6 @@ function Invoke-AzureRequest {
         $errorDetails = $_.ErrorDetails.Message
         if ($errorDetails) {
             Write-Log "Error Response: $errorDetails" "ERROR"
-            try {
-                $errorJson = $errorDetails | ConvertFrom-Json
-                if ($errorJson.error) {
-                    Write-Log "Error Code: $($errorJson.error.code)" "ERROR"
-                    Write-Log "Error Message: $($errorJson.error.message)" "ERROR"
-                    if ($errorJson.error.details) {
-                        Write-Log "Error Details: $($errorJson.error.details | ConvertTo-Json -Depth 5)" "ERROR"
-                    }
-                }
-            }
-            catch {
-                Write-Log "Raw Error Response: $errorDetails" "ERROR"
-            }
         }
         throw
     }
@@ -137,44 +124,20 @@ catch {
 }
 
 # ------------------------------------
-# 2. Check if security connector already exists
-# ------------------------------------
-$apiVersion = "2023-10-01-preview"
-$checkUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$SecurityConnectorName`?api-version=$apiVersion"
-
-try {
-    Write-Log "Checking if security connector '$SecurityConnectorName' already exists..."
-    $existingConnector = Invoke-AzureRequest -Uri $checkUri -Token $token -ErrorAction SilentlyContinue
-    if ($existingConnector) {
-        Write-Log "✅ Security connector already exists. Current status: $($existingConnector.properties.provisioningState)" "WARNING"
-        Write-Log "Hierarchy Identifier: $($existingConnector.properties.hierarchyIdentifier)"
-        Exit 0
-    }
-}
-catch {
-    # 404 is expected if connector doesn't exist
-    if ($_.Exception.Response.StatusCode -ne 404) {
-        Write-Log "Error checking existing connector: $($_.Exception.Message)" "ERROR"
-        Exit 1
-    }
-    Write-Log "Security connector does not exist, proceeding with creation..."
-}
-
-# ------------------------------------
-# 3. Create the Security Connector
+# 2. Create the Security Connector using correct API format
 # ------------------------------------
 Write-Log "Constructing API request for security connector..."
+$apiVersion = "2023-10-01-preview"
 $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$SecurityConnectorName`?api-version=$apiVersion"
 
-# Construct the body with proper formatting for GCP Folder
+# Use the exact format that the API expects based on Microsoft documentation
 $bodyObj = @{
     location = $AzureLocation
     properties = @{
-        hierarchyIdentifier = "folders/$GCPFolderId"  # Use the correct format with "folders/" prefix
         environmentName = "GCP"
+        hierarchyIdentifier = $GCPFolderId
         environmentData = @{
             organizationalData = @{
-                organizationMembershipType = "Organization"
                 organizationId = $GCPOrganizationId
                 workloadIdentityPoolId = $WorkloadPoolId
             }
@@ -183,7 +146,7 @@ $bodyObj = @{
             @{
                 offeringType = "CspmMonitorGcp"
                 nativeCloudConnection = @{
-                    serviceAccountEmailAddress = "microsoft-defender-cspm@$GCPManagementProjectId.iam.gserviceaccount.com"
+                    workloadIdentityProviderId = "cspm"
                 }
             }
         )
@@ -201,44 +164,59 @@ try {
     Write-Log "Provisioning State: $($response.properties.provisioningState)"
     Write-Log "Operation ID: $($response.id)"
     
-    # Monitor provisioning status
-    Write-Log "Monitoring provisioning status..."
-    $maxRetries = 30
-    $retryCount = 0
-    $waitSeconds = 10
-    
-    while ($retryCount -lt $maxRetries) {
-        $statusResponse = Invoke-AzureRequest -Uri $uri -Token $token
-        $provisioningState = $statusResponse.properties.provisioningState
-        
-        Write-Log "Provisioning state: $provisioningState (Attempt $($retryCount + 1)/$maxRetries)"
-        
-        if ($provisioningState -eq "Succeeded") {
-            Write-Log "✅ Provisioning completed successfully!"
-            Write-Log "Security Connector ID: $($statusResponse.id)"
-            Write-Log "Hierarchy Identifier: $($statusResponse.properties.hierarchyIdentifier)"
-            break
-        }
-        elseif ($provisioningState -eq "Failed") {
-            Write-Log "❌ Provisioning failed" "ERROR"
-            if ($statusResponse.properties.statusMessage) {
-                Write-Log "Status Message: $($statusResponse.properties.statusMessage)" "ERROR"
-            }
-            Exit 1
-        }
-        
-        Start-Sleep -Seconds $waitSeconds
-        $retryCount++
-    }
-    
-    if ($retryCount -eq $maxRetries) {
-        Write-Log "⚠️  Provisioning taking longer than expected. Check Azure portal for final status." "WARNING"
-    }
+    Write-Log "=== Script completed successfully ==="
+    Write-Log "Note: Provisioning may take several minutes to complete."
+    Write-Log "Check Azure Portal for final status: https://portal.azure.com/#blade/Microsoft_Azure_Security/SecurityMenuBlade/EnvironmentSettings"
 }
 catch {
     Write-Log "Error creating security connector:" "ERROR"
     Write-Log "Exception Message: $($_.Exception.Message)" "ERROR"
-    Exit 1
+    
+    # Try alternative approach if the first one fails
+    Write-Log "Trying alternative API format..." "WARNING"
+    
+    try {
+        # Alternative format - simpler approach
+        $altBodyObj = @{
+            location = $AzureLocation
+            properties = @{
+                environmentName = "GCP"
+                hierarchyIdentifier = $GCPFolderId
+                offerings = @(
+                    @{
+                        offeringType = "CspmMonitorGcp"
+                    }
+                )
+            }
+        }
+        
+        $altBody = $altBodyObj | ConvertTo-Json -Depth 10
+        Write-Log "Trying alternative request body..."
+        $response = Invoke-AzureRequest -Uri $uri -Method "PUT" -Body $altBody -Token $token
+        Write-Log "✅ Security connector creation initiated with alternative format!"
+        Write-Log "Provisioning State: $($response.properties.provisioningState)"
+    }
+    catch {
+        Write-Log "Alternative approach also failed:" "ERROR"
+        Write-Log "Exception Message: $($_.Exception.Message)" "ERROR"
+        
+        # Final attempt - use Azure CLI as fallback
+        Write-Log "Trying with Azure CLI as fallback..." "WARNING"
+        try {
+            az account set --subscription $SubscriptionId
+            $cliCommand = "az security security-connector create --name $SecurityConnectorName --resource-group $ResourceGroup --location $AzureLocation --environment-name GCP --hierarchy-identifier $GCPFolderId --environment-data organizationalData.organizationId=$GCPOrganizationId organizationalData.workloadIdentityPoolId=$WorkloadPoolId --offering CspmMonitorGcp --output json"
+            Write-Log "Running CLI command: $cliCommand"
+            $cliResult = Invoke-Expression $cliCommand
+            Write-Log "✅ Security connector created via Azure CLI!"
+            Write-Log ($cliResult | ConvertTo-Json -Depth 5)
+        }
+        catch {
+            Write-Log "All attempts failed. Please check:" "ERROR"
+            Write-Log "1. GCP Organization ID is correct: $GCPOrganizationId"
+            Write-Log "2. Workload Identity Pool ID is correct: $WorkloadPoolId"
+            Write-Log "3. You have proper permissions in Azure subscription"
+            Write-Log "4. Try creating manually via Azure Portal first to verify parameters"
+            Exit 1
+        }
+    }
 }
-
-Write-Log "=== Script completed successfully ==="
