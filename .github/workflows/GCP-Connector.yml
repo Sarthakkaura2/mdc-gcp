@@ -1,0 +1,60 @@
+name: Run CreateGCPConnector Script
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      
+    - name: Install Azure PowerShell Modules
+      run: |
+        Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+        Import-Module -Name Az.Resources -Force
+        Import-Module -Name Az.Security -Force
+      shell: pwsh
+      
+    - name: Install Azure CLI
+      run: |
+        $progressPreference = 'silentlyContinue'
+        Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
+        Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+        Remove-Item .\AzureCLI.msi
+      shell: pwsh
+      
+    - name: Authenticate to Azure
+      run: |
+        az login --service-principal --username "d47fb118-5c46-4069-801d-a7c945665e0f" --password "NkG8Q~.FzKAZCNttyqvHxAwaeero5ciRepXKDa6Z" --tenant "1172494f-68e2-4743-8ebb-b6916a1c681e"
+        az account set --subscription "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
+        Write-Host "Azure authentication successful."
+      shell: pwsh
+      
+    - name: Run CreateGCPConnector Script
+      run: |
+        ./connector.ps1 `
+          -SubscriptionId "f2e26c0b-8b27-4edd-b6f4-73edc39a4186" `
+          -TenantId "1172494f-68e2-4743-8ebb-b6916a1c681e" `
+          -GCPFolderId "93604753456" `
+          -WorkloadPoolId "1172494f68e247438ebbb6916a1c681e" `
+          -ClientId "d47fb118-5c46-4069-801d-a7c945665e0f" `
+          -ClientSecret "NkG8Q~.FzKAZCNttyqvHxAwaeero5ciRepXKDa6Z" `
+          -ResourceGroup "kpmg-testing" `
+          -GCPManagementProjectId "your-gcp-management-project-id" `
+          -AzureLocation "eastus" `
+          -SecurityConnectorName "gcp-poc-connector"
+      shell: pwsh
+      
+    - name: Verify Deployment
+      run: |
+        $subscriptionId = "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
+        $resourceGroup = "kpmg-testing"
+        $connectorName = "gcp-poc-connector"
+        
+        $connector = az security security-connector show --name $connectorName --resource-group $resourceGroup --subscription $subscriptionId --output json | ConvertFrom-Json
+        Write-Host "Security Connector Status: $($connector.properties.provisioningState)"
+        Write-Host "Hierarchy Identifier: $($connector.properties.hierarchyIdentifier)"
+      shell: pwsh
