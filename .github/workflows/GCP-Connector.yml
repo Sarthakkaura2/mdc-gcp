@@ -43,7 +43,7 @@ jobs:
           -ClientId "d47fb118-5c46-4069-801d-a7c945665e0f" `
           -ClientSecret "NkG8Q~.FzKAZCNttyqvHxAwaeero5ciRepXKDa6Z" `
           -ResourceGroup "kpmg-testing" `
-          -GCPManagementProjectId "your-gcp-management-project-id" `
+          -GCPManagementProjectId "gcp-containers-dso-prod-189401" `
           -AzureLocation "eastus" `
           -SecurityConnectorName "gcp-poc-connector"
       shell: pwsh
