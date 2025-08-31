@@ -49,6 +49,35 @@ jobs:
           -SecurityConnectorName "gcp-poc-connector"
       shell: pwsh
       
+    - name: Try Azure CLI alternative
+      run: |
+        az account set --subscription "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
+        
+        # Create a JSON file with the correct format
+        $connectorConfig = @{
+            location = "eastus"
+            properties = @{
+                hierarchyIdentifier = "93604753456"
+                environmentName = "GCP"
+                environmentData = @{
+                    organizationalData = @{
+                        organizationId = "1044632980853"
+                    }
+                }
+                offerings = @(
+                    @{
+                        offeringType = "CspmMonitorGcp"
+                    }
+                )
+            }
+        }
+        
+        $connectorConfig | ConvertTo-Json -Depth 5 | Out-File "connector-config.json"
+        
+        # Use az rest command for direct API call
+        az rest --method PUT --uri "https://management.azure.com/subscriptions/f2e26c0b-8b27-4edd-b6f4-73edc39a4186/resourceGroups/kpmg-testing/providers/Microsoft.Security/securityConnectors/gcp-poc-connector?api-version=2023-10-01-preview" --body "@connector-config.json"
+      shell: pwsh
+      
     - name: Verify Deployment
       run: |
         $subscriptionId = "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
