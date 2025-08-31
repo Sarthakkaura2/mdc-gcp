@@ -130,16 +130,15 @@ Write-Log "Constructing API request for security connector..."
 $apiVersion = "2023-10-01-preview"
 $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$SecurityConnectorName`?api-version=$apiVersion"
 
-# Use the exact format that the API expects based on Microsoft documentation
+# Use the exact format from Microsoft documentation
 $bodyObj = @{
     location = $AzureLocation
     properties = @{
-        environmentName = "GCP"
         hierarchyIdentifier = $GCPFolderId
+        environmentName = "GCP"
         environmentData = @{
             organizationalData = @{
                 organizationId = $GCPOrganizationId
-                workloadIdentityPoolId = $WorkloadPoolId
             }
         }
         offerings = @(
@@ -147,6 +146,7 @@ $bodyObj = @{
                 offeringType = "CspmMonitorGcp"
                 nativeCloudConnection = @{
                     workloadIdentityProviderId = "cspm"
+                    serviceAccountEmailAddress = "microsoft-defender-cspm@$GCPManagementProjectId.iam.gserviceaccount.com"
                 }
             }
         )
@@ -165,26 +165,32 @@ try {
     Write-Log "Operation ID: $($response.id)"
     
     Write-Log "=== Script completed successfully ==="
-    Write-Log "Note: Provisioning may take several minutes to complete."
-    Write-Log "Check Azure Portal for final status: https://portal.azure.com/#blade/Microsoft_Azure_Security/SecurityMenuBlade/EnvironmentSettings"
+    Exit 0
 }
 catch {
     Write-Log "Error creating security connector:" "ERROR"
     Write-Log "Exception Message: $($_.Exception.Message)" "ERROR"
     
-    # Try alternative approach if the first one fails
-    Write-Log "Trying alternative API format..." "WARNING"
+    # Try without workloadIdentityProviderId
+    Write-Log "Trying alternative format without workloadIdentityProviderId..." "WARNING"
     
     try {
-        # Alternative format - simpler approach
         $altBodyObj = @{
             location = $AzureLocation
             properties = @{
-                environmentName = "GCP"
                 hierarchyIdentifier = $GCPFolderId
+                environmentName = "GCP"
+                environmentData = @{
+                    organizationalData = @{
+                        organizationId = $GCPOrganizationId
+                    }
+                }
                 offerings = @(
                     @{
                         offeringType = "CspmMonitorGcp"
+                        nativeCloudConnection = @{
+                            serviceAccountEmailAddress = "microsoft-defender-cspm@$GCPManagementProjectId.iam.gserviceaccount.com"
+                        }
                     }
                 )
             }
@@ -195,27 +201,43 @@ catch {
         $response = Invoke-AzureRequest -Uri $uri -Method "PUT" -Body $altBody -Token $token
         Write-Log "✅ Security connector creation initiated with alternative format!"
         Write-Log "Provisioning State: $($response.properties.provisioningState)"
+        Exit 0
     }
     catch {
         Write-Log "Alternative approach also failed:" "ERROR"
         Write-Log "Exception Message: $($_.Exception.Message)" "ERROR"
         
-        # Final attempt - use Azure CLI as fallback
-        Write-Log "Trying with Azure CLI as fallback..." "WARNING"
+        # Try the simplest possible approach
+        Write-Log "Trying simplest format..." "WARNING"
+        
         try {
-            az account set --subscription $SubscriptionId
-            $cliCommand = "az security security-connector create --name $SecurityConnectorName --resource-group $ResourceGroup --location $AzureLocation --environment-name GCP --hierarchy-identifier $GCPFolderId --environment-data organizationalData.organizationId=$GCPOrganizationId organizationalData.workloadIdentityPoolId=$WorkloadPoolId --offering CspmMonitorGcp --output json"
-            Write-Log "Running CLI command: $cliCommand"
-            $cliResult = Invoke-Expression $cliCommand
-            Write-Log "✅ Security connector created via Azure CLI!"
-            Write-Log ($cliResult | ConvertTo-Json -Depth 5)
+            $simpleBodyObj = @{
+                location = $AzureLocation
+                properties = @{
+                    hierarchyIdentifier = $GCPFolderId
+                    environmentName = "GCP"
+                    offerings = @(
+                        @{
+                            offeringType = "CspmMonitorGcp"
+                        }
+                    )
+                }
+            }
+            
+            $simpleBody = $simpleBodyObj | ConvertTo-Json -Depth 10
+            Write-Log "Trying simplest request body..."
+            $response = Invoke-AzureRequest -Uri $uri -Method "PUT" -Body $simpleBody -Token $token
+            Write-Log "✅ Security connector creation initiated with simplest format!"
+            Write-Log "Provisioning State: $($response.properties.provisioningState)"
+            Exit 0
         }
         catch {
-            Write-Log "All attempts failed. Please check:" "ERROR"
-            Write-Log "1. GCP Organization ID is correct: $GCPOrganizationId"
-            Write-Log "2. Workload Identity Pool ID is correct: $WorkloadPoolId"
-            Write-Log "3. You have proper permissions in Azure subscription"
-            Write-Log "4. Try creating manually via Azure Portal first to verify parameters"
+            Write-Log "All API attempts failed. Please check:" "ERROR"
+            Write-Log "1. Verify GCP Organization ID: $GCPOrganizationId"
+            Write-Log "2. Verify GCP Folder ID: $GCPFolderId" 
+            Write-Log "3. Check Azure permissions for service principal"
+            Write-Log "4. Try creating manually in Azure Portal first"
+            Write-Log "Portal URL: https://portal.azure.com/#blade/Microsoft_Azure_Security/SecurityMenuBlade/EnvironmentSettings"
             Exit 1
         }
     }
