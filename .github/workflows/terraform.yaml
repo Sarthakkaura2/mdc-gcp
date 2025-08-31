@@ -26,6 +26,10 @@ jobs:
       run: |
         az account set --subscription "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
 
+    - name: Create resource group if not exists
+      run: |
+        az group create --name "kpmg-testing" --location "eastus" || echo "Resource group already exists"
+
     - name: Create ARM template file
       run: |
         cat > arm-template.json << 'EOF'
@@ -69,16 +73,14 @@ jobs:
       run: |
         az deployment group validate \
           --resource-group "kpmg-testing" \
-          --template-file "arm-template.json" \
-          --parameters @-
+          --template-file "arm-template.json"
 
     - name: Deploy ARM template
       run: |
         az deployment group create \
           --resource-group "kpmg-testing" \
           --template-file "arm-template.json" \
-          --name "gcp-connector-deployment" \
-          --parameters @-
+          --name "gcp-connector-deployment"
 
     - name: Check deployment status
       run: |
