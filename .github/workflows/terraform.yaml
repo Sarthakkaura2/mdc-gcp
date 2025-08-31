@@ -1,4 +1,4 @@
-name: Deploy GCP Security Connector with Azure CLI
+name: Deploy GCP Security Connector with ARM Template
 
 on:
   workflow_dispatch:
@@ -8,108 +8,90 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
     - name: Install Azure CLI
       run: |
         curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        az version
 
-    - name: Login to Azure with Service Principal
+    - name: Login to Azure
       run: |
         az login --service-principal \
           --username "d47fb118-5c46-4069-801d-a7c945665e0f" \
           --password "NkG8Q~.FzKAZCNttyqvHxAwaeero5ciRepXKDa6Z" \
           --tenant "1172494f-68e2-4743-8ebb-b6916a1c681e"
 
-    - name: Set Azure Subscription
+    - name: Set subscription
       run: |
         az account set --subscription "f2e26c0b-8b27-4edd-b6f4-73edc39a4186"
-        az account show
 
-    - name: Create Resource Group if not exists
+    - name: Create ARM template file
       run: |
-        az group create --name "kpmg-testing" --location "eastus" || echo "Resource group already exists"
-
-    - name: Create Security Connector Configuration
-      run: |
-        cat > connector-config.json << 'EOF'
+        cat > arm-template.json << 'EOF'
         {
-          "location": "eastus",
-          "properties": {
-            "hierarchyIdentifier": "93604753456",
-            "environmentName": "GCP",
-            "environmentData": {
-              "organizationalData": {
-                "organizationMembershipType": "Organization",
-                "organizationId": "1044632980853",
-                "workloadIdentityPoolId": "1172494f68e247438ebbb6916a1c681e"
-              }
-            },
-            "offerings": [
-              {
-                "offeringType": "CspmMonitorGcp",
-                "nativeCloudConnection": {
-                  "workloadIdentityProviderId": "cspm",
-                  "serviceAccountEmailAddress": "microsoft-defender-cspm@gcp-containers-dso-prod-189401.iam.gserviceaccount.com"
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+            "contentVersion": "1.0.0.0",
+            "parameters": {},
+            "variables": {},
+            "resources": [
+                {
+                    "type": "Microsoft.Security/securityConnectors",
+                    "apiVersion": "2023-10-01-preview",
+                    "name": "gcp-poc-connector",
+                    "location": "eastus",
+                    "properties": {
+                        "hierarchyIdentifier": "93604753456",
+                        "environmentName": "GCP",
+                        "environmentData": {
+                            "organizationalData": {
+                                "organizationMembershipType": "Organization",
+                                "organizationId": "1044632980853",
+                                "workloadIdentityPoolId": "1172494f68e247438ebbb6916a1c681e"
+                            }
+                        },
+                        "offerings": [
+                            {
+                                "offeringType": "CspmMonitorGcp",
+                                "nativeCloudConnection": {
+                                    "workloadIdentityProviderId": "cspm",
+                                    "serviceAccountEmailAddress": "microsoft-defender-cspm@gcp-containers-dso-prod-189401.iam.gserviceaccount.com"
+                                }
+                            }
+                        ]
+                    }
                 }
-              }
             ]
-          }
         }
         EOF
-        
-        echo "Configuration file created:"
-        cat connector-config.json
 
-    - name: Deploy Security Connector
+    - name: Validate ARM template
       run: |
-        echo "Deploying GCP security connector..."
-        az rest --method PUT \
-          --uri "https://management.azure.com/subscriptions/f2e26c0b-8b27-4edd-b6f4-73edc39a4186/resourceGroups/kpmg-testing/providers/Microsoft.Security/securityConnectors/gcp-poc-connector?api-version=2023-10-01-preview" \
-          --body @connector-config.json
+        az deployment group validate \
+          --resource-group "kpmg-testing" \
+          --template-file "arm-template.json" \
+          --parameters @-
 
-    - name: Check Deployment Status
+    - name: Deploy ARM template
+      run: |
+        az deployment group create \
+          --resource-group "kpmg-testing" \
+          --template-file "arm-template.json" \
+          --name "gcp-connector-deployment" \
+          --parameters @-
+
+    - name: Check deployment status
+      run: |
+        az deployment group show \
+          --resource-group "kpmg-testing" \
+          --name "gcp-connector-deployment" \
+          --query properties.provisioningState
+
+    - name: Verify security connector
       run: |
         echo "Waiting for deployment to complete..."
         sleep 30
-        
-        # Check if connector was created
         az security security-connector show \
           --name "gcp-poc-connector" \
-          --resource-group "kpmg-testing" \
-          --output json || echo "Connector may still be provisioning"
-
-    - name: Alternative API Versions if needed
-      if: failure()
-      run: |
-        echo "Trying alternative API versions..."
-        
-        # Try different API versions
-        api_versions=("2022-08-01-preview" "2022-05-01-preview" "2021-07-01-preview")
-        
-        for version in "${api_versions[@]}"; do
-          echo "Trying API version: $version"
-          az rest --method PUT \
-            --uri "https://management.azure.com/subscriptions/f2e26c0b-8b27-4edd-b6f4-73edc39a4186/resourceGroups/kpmg-testing/providers/Microsoft.Security/securityConnectors/gcp-poc-connector?api-version=$version" \
-            --body @connector-config.json && break
-        done
-
-    - name: Simple Test if all else fails
-      if: failure()
-      run: |
-        echo "Trying simplest possible configuration..."
-        az rest --method PUT \
-          --uri "https://management.azure.com/subscriptions/f2e26c0b-8b27-4edd-b6f4-73edc39a4186/resourceGroups/kpmg-testing/providers/Microsoft.Security/securityConnectors/gcp-poc-connector?api-version=2023-10-01-preview" \
-          --body '{
-            "location": "eastus",
-            "properties": {
-              "hierarchyIdentifier": "93604753456",
-              "environmentName": "GCP"
-            }
-          }'
-
-    - name: Final Verification
-      run: |
-        echo "Final status check..."
-        az security security-connector list \
           --resource-group "kpmg-testing" \
           --output table
