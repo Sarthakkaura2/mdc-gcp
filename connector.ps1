@@ -8,7 +8,10 @@ param(
     [Parameter(Mandatory = $true)]$ClientId,
     [Parameter(Mandatory = $true)]$ClientSecret,
     [Parameter(Mandatory = $true)]$ResourceGroup,
-    [Parameter(Mandatory = $false)]$WORKLOAD_POOL_ID
+    [Parameter(Mandatory = $false)]$WORKLOAD_POOL_ID,
+    [Parameter(Mandatory = $false)]$ManagementProjectNumber
+
+    
 )
 
 $LogFile = Join-Path $PSScriptRoot "connector.log"
