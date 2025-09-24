@@ -14,7 +14,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up PowerShell
-        uses: actions/setup-powershell@v2
+        uses: PowerShell/setup-powershell@v2
+        with:
+          pwsh-version: '7.3.10'  # pick latest stable PowerShell Core
 
       - name: Install Az PowerShell module
         run: |
