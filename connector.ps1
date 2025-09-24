@@ -4,12 +4,11 @@ param(
     [Parameter(Mandatory = $false)]$TeamName,
     [Parameter(Mandatory = $true)]$TenantId,
     [Parameter(Mandatory = $true)]$GCPFolderId,
-    [Parameter(Mandatory = $true)]$GCPManagementProjectId,
+    [Parameter(Mandatory = $true)]$ManagementProjectId,
     [Parameter(Mandatory = $true)]$ClientId,
     [Parameter(Mandatory = $true)]$ClientSecret,
     [Parameter(Mandatory = $true)]$ResourceGroup,
-    [Parameter(Mandatory = $true)]$WORKLOAD_POOL_ID,
-    [Parameter(Mandatory = $false)]$AccessToken
+    [Parameter(Mandatory = $false)]$WORKLOAD_POOL_ID,
 )
 
 $LogFile = Join-Path $PSScriptRoot "connector.log"
