@@ -1,71 +1,118 @@
 param(
-  [Parameter(Mandatory = $true)]$SubscriptionId,
-  [Parameter(Mandatory = $true)]$TenantId,
-  [Parameter(Mandatory = $true)]$ClientId,
-  [Parameter(Mandatory = $true)]$ClientSecret,
-  [Parameter(Mandatory = $true)]$ResourceGroup,
-  [Parameter(Mandatory = $true)]$GCPFolderId,
-  [Parameter(Mandatory = $true)]$ManagementProjectId,
-  [Parameter(Mandatory = $true)]$ManagementProjectNumber
+    [Parameter(Mandatory = $false)]$Workspace,
+    [Parameter(Mandatory = $true)]$SubscriptionId,
+    [Parameter(Mandatory = $false)]$TeamName,
+    [Parameter(Mandatory = $true)]$TenantId,
+    [Parameter(Mandatory = $true)]$GCPFolderId,
+    [Parameter(Mandatory = $true)]$GCPManagementProjectId,
+    [Parameter(Mandatory = $true)]$ClientId,
+    [Parameter(Mandatory = $true)]$ClientSecret,
+    [Parameter(Mandatory = $true)]$ResourceGroup,
+    [Parameter(Mandatory = $true)]$WORKLOAD_POOL_ID,
+    [Parameter(Mandatory = $false)]$AccessToken
 )
 
-$LogFile = Join-Path $PSScriptRoot "connector-folder.log"
-$JsonDumpFile = Join-Path $PSScriptRoot "final-body.json"
+$LogFile = Join-Path $PSScriptRoot "connector.log"
 
 function Write-Log {
-  param([string]$Message)
-  $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-  Add-Content -Path $LogFile -Value "$timestamp $Message"
-  Write-Host $Message
+    param([string]$Message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $LogFile -Value "$timestamp $Message"
+    Write-Host "$timestamp $Message"
 }
 
-Write-Log "=== Starting minimal GCP Folder Security Connector test ==="
+Write-Log "=== Script started ==="
+Write-Log "Logging to file: $LogFile"
+Write-Log "Validating script parameters..."
 
-# Authenticate
+if (-not $SubscriptionId) { Write-Log "ERROR: SubscriptionId is missing." -ForegroundColor Red; exit }
+if (-not $TenantId) { Write-Log "ERROR: TenantId is missing." -ForegroundColor Red; exit }
+if (-not $GCPFolderId) { Write-Log "ERROR: GCPFolderId is missing." -ForegroundColor Red; exit }
+if (-not $GCPManagementProjectId) { Write-Log "ERROR: GCPManagementProjectId is missing." -ForegroundColor Red; exit }
+if (-not $ClientId) { Write-Log "ERROR: ClientId is missing." -ForegroundColor Red; exit }
+if (-not $ClientSecret) { Write-Log "ERROR: ClientSecret is missing." -ForegroundColor Red; exit }
+if (-not $ResourceGroup) { Write-Log "ERROR: ResourceGroup is missing." -ForegroundColor Red; exit }
+if (-not $WORKLOAD_POOL_ID) { Write-Log "ERROR: WORKLOAD_POOL_ID is missing." -ForegroundColor Red; exit }
+
+Write-Log "Parameters validated. Proceeding with authentication."
+Write-Log "Importing Az modules..."
+Import-Module -Name Az.Resources -Force
+Import-Module -Name Az.SecurityInsights -Force
+Import-Module -Name Az.OperationalInsights -Force
+
+Write-Log "Authenticating to Azure with service principal..."
+Clear-AzContext -Force -ErrorAction SilentlyContinue
 $securePassword = $ClientSecret | ConvertTo-SecureString -AsPlainText -Force
 $credential = New-Object System.Management.Automation.PSCredential($ClientId, $securePassword)
-Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $TenantId -Force | Out-Null
-Set-AzContext -Subscription $SubscriptionId
+try {
+    $connectResult = Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $TenantId -Force
+    if ($connectResult) {
+        Write-Log "✅ Authentication successful"
+        Write-Log "    Account: $($connectResult.Context.Account.Id)"
+    }
+    Set-AzContext -Subscription $SubscriptionId
+    Write-Log "Login to Azure is successful and context is set."
+    Get-AzContext | Out-String | Write-Log
+} catch {
+    Write-Log "❌ FATAL ERROR: Failed to authenticate to Azure." -ForegroundColor Red
+    Write-Log "Exception Message: $($_.Exception.Message)"
+    exit
+}
 
-# API setup
-$apiVersion = "2024-03-01-preview"
-$securityConnectorName = "gcp-folder-test-connector"
-$location = "uksouth"
+$apiVersion = "2023-10-01-preview"
+$securityConnectorName = "gcp-folder-connector-kpmg-uk-$(Get-Date -Format 'yyMMddHHmm')"
 $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$securityConnectorName`?api-version=$apiVersion"
+Write-Log "Constructed URI: $uri"
 
-# Minimal request body (only CSPM offering)
 $bodyObj = @{
-  location   = $location
-  kind       = "Gcp"
-  properties = @{
-    environmentName     = "GCP"
-    hierarchyIdentifier = "folders/$GCPFolderId"
-    environmentData     = @{
-      environmentType = "GcpFolder"
-      folderDetails   = @{
-        folderId = "$GCPFolderId"
-      }
-      projectDetails = @{
-        projectId     = "$ManagementProjectId"
-        projectNumber = "$ManagementProjectNumber"
-      }
-      organizationalData = @{
-        organizationMembershipType  = "Organization"
-        serviceAccountEmailAddress  = "microsoft-defender-cspm@sbx-sentinel-mde-dev.iam.gserviceaccount.com"
-        workloadIdentityProviderId  = "projects/$ManagementProjectNumber/locations/global/workloadIdentityPools/117249f6e24734b8bb691a16a81e/providers/cspm"
-        excludedProjectNumbers      = @()
-      }
-    }
-    offerings = @(
-      @{
-        offeringType = "CspmMonitorGcp"
-        nativeCloudConnection = @{
-          serviceAccountEmailAddress = "microsoft-defender-cspm@sbx-sentinel-mde-dev.iam.gserviceaccount.com"
-          workloadIdentityProviderId = "projects/$ManagementProjectNumber/locations/global/workloadIdentityPools/117249f6e24734b8bb691a16a81e/providers/cspm"
-        }
-      }
-    )
-  }
+    location = "uksouth"
+    properties = @{
+        hierarchyIdentifier = $GCPManagementProjectId
+        environmentName = "GCP"
+        environmentData = @{
+                environmentType = "GcpProject"
+                gcpProjectData = @{
+                    projectDetails = @{
+                        projectId = $GCPManagementProjectId
+                        workloadIdentityPoolId = $WORKLOAD_POOL_ID
+                        workloadIdentityProviderId = "gcp-provider-for-cloud-connector"
+                    }
+                }
+        }
+        offerings = @(
+            @{
+                offeringType = "CspmMonitorGcp"
+                nativeCloudConnection = @{
+                    serviceAccountEmailAddress = "microsoft-defender-cspm@$GCPManagementProjectId.iam.gserviceaccount.com"
+                    workloadIdentityProviderId = "cspm"
+                }
+            },
+            @{
+                offeringType = "DefenderForServersGcp"
+                defenderForServers = @{
+                    serviceAccountEmailAddress = "microsoft-defender-for-servers@$GCPManagementProjectId.iam.gserviceaccount.com"
+                    workloadIdentityProviderId = "defender-for-servers"
+                }
+                mdeAutoProvisioning = @{
+                    enabled = $true
+                    configuration = @{}
+                }
+                arcAutoProvisioning = @{
+                    enabled = $true
+                    configuration = @{}
+                }
+                vmScanners = @{
+                    enabled = $true
+                    configuration = @{
+                        cloudRoleArn = "projects/$GCPProjectNumber/serviceAccounts/microsoft-defender-agentless@$GCPManagementProjectId.iam.gserviceaccount.com"
+                        scanningMode = "Default"
+                        exclusionTags = @{}
+                    }
+                }
+                subPlan = "P2"
+            }
+        )
+    }
 }
 
 $body = $bodyObj | ConvertTo-Json -Depth 10
@@ -116,10 +163,3 @@ catch {
 }
 
 Write-Host "Script execution completed."
-
-
-
-
-
-
-
