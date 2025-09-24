@@ -81,44 +81,90 @@ catch {
   exit 1
 }
 
-# Get access token
 $token = (Get-AzAccessToken -ResourceUrl "https://management.azure.com/").Token
 
-# Headers
+Write-Host "Access token retrieved and masked successfully."
+
+
+
+if ($token -is [System.Security.SecureString]) {
+
+    $token = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($token))
+
+}
+
+
+
 $headers = @{
-  "Authorization" = "Bearer $token"
-  "Content-Type"  = "application/json"
+
+    "Authorization" = "Bearer $token"
+
+    "Content-Type"  = "application/json"
+
 }
 
-# Send request
+write-host $headers.Authorization
+
+
+
 try {
-  Write-Log "🚀 Sending PUT request to create minimal folder-level security connector..."
-  $response = Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -Body $body
-  Write-Log "✅ Security connector created successfully:"
-  $response | ConvertTo-Json -Depth 10 | Write-Log
+
+    $response = Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -Body $body
+
+    Write-Host "Security connector created successfully:"
+
+    $response | ConvertTo-Json -Depth 10
+
 }
+
 catch {
-  Write-Log "❌ Error creating security connector:"
-  Write-Log "Exception Type: $($_.Exception.GetType().FullName)"
-  Write-Log "Exception Message: $($_.Exception.Message)"
 
-  if ($_.Exception.Response) {
-    $statusCode = [int]$_.Exception.Response.StatusCode
-    Write-Log "Status Code: $statusCode"
+    Write-Host "Error creating security connector:"
 
-    try {
-      $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-      $responseBody = $reader.ReadToEnd()
-      Write-Log "Response Body: $responseBody"
-    }
-    catch {
-      Write-Log "⚠️ Could not read response body"
-    }
-  }
+    Write-Host "Exception Type: $($_.Exception.GetType().FullName)"
 
-  if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
-    Write-Log "ErrorDetails: $($_.ErrorDetails.Message)"
-  }
+    Write-Host "Exception Message: $($_.Exception.Message)"
+
+    if ($_.Exception.Response) {
+
+        $statusCode = [int]$_.Exception.Response.StatusCode
+
+        Write-Host "Status Code: $statusCode"
+
+        $responseBody = $_.ErrorDetails.Message
+
+        if ($responseBody) {
+
+            Write-Host "Response Body: $responseBody"
+
+        }
+
+    }
+
 }
 
-Write-Log "=== Script execution completed ==="
+
+
+Write-Host "Verifying permissions and access..."
+
+try {
+
+    $resources = Get-AzResource -ResourceGroupName $ResourceGroup
+
+    Write-Host "Successfully listed resources in the resource group. Basic access confirmed."
+
+    $resources | Format-Table Name, ResourceType -AutoSize
+
+}
+
+catch {
+
+    Write-Host "Error listing resources in the resource group:"
+
+    Write-Host $_.Exception.Message
+
+}
+
+
+
+Write-Host "Script execution completed."
