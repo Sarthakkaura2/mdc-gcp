@@ -68,18 +68,9 @@ $bodyObj = @{
   }
 }
 
-# Convert and validate JSON
-try {
-  $body = $bodyObj | ConvertTo-Json -Depth 10 -Compress
-  $body | ConvertFrom-Json | Out-Null
-  Write-Log "✅ JSON validated successfully."
-  $body | Out-File -FilePath $JsonDumpFile -Encoding utf8
-  Write-Log "📄 JSON dumped to: $JsonDumpFile"
-}
-catch {
-  Write-Log "❌ JSON validation failed: $($_.Exception.Message)"
-  exit 1
-}
+$body = $bodyObj | ConvertTo-Json -Depth 10
+Write-Log "Generated JSON body for API call:"
+Write-Log ($body | Out-String)
 
 $token = (Get-AzAccessToken -ResourceUrl "https://management.azure.com/").Token
 Write-Host "Access token retrieved and masked successfully."
@@ -87,6 +78,7 @@ Write-Host "Access token retrieved and masked successfully."
 if ($token -is [System.Security.SecureString]) {
     $token = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($token))
 }
+
 $headers = @{
     "Authorization" = "Bearer $token"
     "Content-Type"  = "application/json"
@@ -102,7 +94,6 @@ catch {
     Write-Host "Error creating security connector:"
     Write-Host "Exception Type: $($_.Exception.GetType().FullName)"
     Write-Host "Exception Message: $($_.Exception.Message)"
-
     if ($_.Exception.Response) {
         $statusCode = [int]$_.Exception.Response.StatusCode
         Write-Host "Status Code: $statusCode"
@@ -112,8 +103,8 @@ catch {
         }
     }
 }
-Write-Host "Verifying permissions and access..."
 
+Write-Host "Verifying permissions and access..."
 try {
     $resources = Get-AzResource -ResourceGroupName $ResourceGroup
     Write-Host "Successfully listed resources in the resource group. Basic access confirmed."
@@ -125,3 +116,10 @@ catch {
 }
 
 Write-Host "Script execution completed."
+
+
+
+
+
+
+
