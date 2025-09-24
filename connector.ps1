@@ -8,7 +8,6 @@ param(
     [Parameter(Mandatory = $true)]$ClientId,
     [Parameter(Mandatory = $true)]$ClientSecret,
     [Parameter(Mandatory = $true)]$ResourceGroup,
-    [Parameter(Mandatory = $false)]$WORKLOAD_POOL_ID,
     [Parameter(Mandatory = $false)]$ManagementProjectNumber
 
     
@@ -34,7 +33,6 @@ if (-not $ManagementProjectNumber) { Write-Log "ERROR: ManagementProjectNumber i
 if (-not $ClientId) { Write-Log "ERROR: ClientId is missing." -ForegroundColor Red; exit }
 if (-not $ClientSecret) { Write-Log "ERROR: ClientSecret is missing." -ForegroundColor Red; exit }
 if (-not $ResourceGroup) { Write-Log "ERROR: ResourceGroup is missing." -ForegroundColor Red; exit }
-if (-not $WORKLOAD_POOL_ID) { Write-Log "ERROR: WORKLOAD_POOL_ID is missing." -ForegroundColor Red; exit }
 
 Write-Log "Parameters validated. Proceeding with authentication."
 Write-Log "Importing Az modules..."
