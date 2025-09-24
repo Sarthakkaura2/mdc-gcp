@@ -23,6 +23,7 @@ jobs:
 
       - name: Set up PowerShell
         uses: PowerShell/setup-pwsh@v2
+
         with:
           version: '7.3.10'
 
