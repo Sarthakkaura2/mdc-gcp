@@ -16,48 +16,6 @@ jobs:
         run: |
           Install-Module -Name Az -Force -Scope CurrentUser -AllowClobber
 
-      - name: Authenticate with Service Principal
-        shell: pwsh
-        run: |
-          $SubscriptionId = "c5fddee6-8712-4dd8-b580-637b37dc5472"
-          $TenantId       = "831de134-d871-4cd7-823a-eacb69c699c8"
-          $ClientId       = "449d0493-4b3a-4a76-ae09-438169332c20"
-          $ClientSecret   = "lqa8Q~mI7GboAa.-jNped64HA8o2dp2FPambocQf"
-
-          $securePassword = $ClientSecret | ConvertTo-SecureString -AsPlainText -Force
-          $credential = New-Object System.Management.Automation.PSCredential($ClientId, $securePassword)
-
-          Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $TenantId -Force | Out-Null
-          Set-AzContext -Subscription $SubscriptionId
-
-      - name: Assign Security Admin Role to SP
-        shell: pwsh
-        run: |
-          $Scope = "/subscriptions/c5fddee6-8712-4dd8-b580-637b37dc5472"
-          $RoleDefinition = "Security Admin"
-          $Assignee = "449d0493-4b3a-4a76-ae09-438169332c20"
-
-          Write-Host "Assigning '$RoleDefinition' role to SP at subscription scope..."
-          try {
-              $existing = Get-AzRoleAssignment -RoleDefinitionName $RoleDefinition -Scope $Scope -SignInName $Assignee -ErrorAction SilentlyContinue
-              if (-not $existing) {
-                  New-AzRoleAssignment -ObjectId $Assignee -RoleDefinitionName $RoleDefinition -Scope $Scope
-                  Write-Host "✅ Role assignment created."
-              } else {
-                  Write-Host "✅ Role assignment already exists."
-              }
-          } catch {
-              Write-Host "⚠️ Could not assign role: $($_.Exception.Message)"
-          }
-
-      - name: Verify Access
-        shell: pwsh
-        run: |
-          $ResourceGroup = "kpmg-testing"
-          Write-Host "Listing resources in resource group '$ResourceGroup'..."
-          $resources = Get-AzResource -ResourceGroupName $ResourceGroup
-          $resources | Format-Table Name, ResourceType -AutoSize
-
       - name: Run GCP Folder Connector Script
         shell: pwsh
         run: |
