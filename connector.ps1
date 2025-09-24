@@ -63,7 +63,7 @@ $apiVersion = "2023-10-01-preview"
 $securityConnectorName = "gcp-folder-connector-kpmg-uk-$(Get-Date -Format 'yyMMddHHmm')"
 $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$securityConnectorName`?api-version=$apiVersion"
 Write-Log "Constructed URI: $uri"
-
+$location = "uksouth" 
 $bodyObj = @{
   location   = $location
   kind       = "Gcp"
