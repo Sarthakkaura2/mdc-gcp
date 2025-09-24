@@ -30,7 +30,7 @@ Write-Log "Validating script parameters..."
 if (-not $SubscriptionId) { Write-Log "ERROR: SubscriptionId is missing." -ForegroundColor Red; exit }
 if (-not $TenantId) { Write-Log "ERROR: TenantId is missing." -ForegroundColor Red; exit }
 if (-not $GCPFolderId) { Write-Log "ERROR: GCPFolderId is missing." -ForegroundColor Red; exit }
-if (-not $GCPManagementProjectId) { Write-Log "ERROR: GCPManagementProjectId is missing." -ForegroundColor Red; exit }
+if (-not $ManagementProjectNumber) { Write-Log "ERROR: ManagementProjectNumber is missing." -ForegroundColor Red; exit }
 if (-not $ClientId) { Write-Log "ERROR: ClientId is missing." -ForegroundColor Red; exit }
 if (-not $ClientSecret) { Write-Log "ERROR: ClientSecret is missing." -ForegroundColor Red; exit }
 if (-not $ResourceGroup) { Write-Log "ERROR: ResourceGroup is missing." -ForegroundColor Red; exit }
@@ -69,13 +69,13 @@ Write-Log "Constructed URI: $uri"
 $bodyObj = @{
     location = "uksouth"
     properties = @{
-        hierarchyIdentifier = $GCPManagementProjectId
+        hierarchyIdentifier = $ManagementProjectNumber
         environmentName = "GCP"
         environmentData = @{
                 environmentType = "GcpProject"
                 gcpProjectData = @{
                     projectDetails = @{
-                        projectId = $GCPManagementProjectId
+                        projectId = $ManagementProjectNumber
                         workloadIdentityPoolId = $WORKLOAD_POOL_ID
                         workloadIdentityProviderId = "gcp-provider-for-cloud-connector"
                     }
@@ -85,14 +85,14 @@ $bodyObj = @{
             @{
                 offeringType = "CspmMonitorGcp"
                 nativeCloudConnection = @{
-                    serviceAccountEmailAddress = "microsoft-defender-cspm@$GCPManagementProjectId.iam.gserviceaccount.com"
+                    serviceAccountEmailAddress = "microsoft-defender-cspm@$ManagementProjectNumber.iam.gserviceaccount.com"
                     workloadIdentityProviderId = "cspm"
                 }
             },
             @{
                 offeringType = "DefenderForServersGcp"
                 defenderForServers = @{
-                    serviceAccountEmailAddress = "microsoft-defender-for-servers@$GCPManagementProjectId.iam.gserviceaccount.com"
+                    serviceAccountEmailAddress = "microsoft-defender-for-servers@$ManagementProjectNumber.iam.gserviceaccount.com"
                     workloadIdentityProviderId = "defender-for-servers"
                 }
                 mdeAutoProvisioning = @{
@@ -106,7 +106,7 @@ $bodyObj = @{
                 vmScanners = @{
                     enabled = $true
                     configuration = @{
-                        cloudRoleArn = "projects/$GCPProjectNumber/serviceAccounts/microsoft-defender-agentless@$GCPManagementProjectId.iam.gserviceaccount.com"
+                        cloudRoleArn = "projects/$GCPProjectNumber/serviceAccounts/microsoft-defender-agentless@$ManagementProjectNumber.iam.gserviceaccount.com"
                         scanningMode = "Default"
                         exclusionTags = @{}
                     }
