@@ -5,13 +5,13 @@ on:
     inputs:
       GCPFolderId:
         description: 'GCP Folder ID'
-        required: true
+        required: false
       ManagementProjectId:
         description: 'GCP Management Project ID'
-        required: true
+        required: false
       ManagementProjectNumber:
         description: 'GCP Management Project Number'
-        required: true
+        required: false
 
 jobs:
   deploy:
