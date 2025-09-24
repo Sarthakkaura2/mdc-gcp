@@ -82,89 +82,46 @@ catch {
 }
 
 $token = (Get-AzAccessToken -ResourceUrl "https://management.azure.com/").Token
-
 Write-Host "Access token retrieved and masked successfully."
 
-
-
 if ($token -is [System.Security.SecureString]) {
-
     $token = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($token))
-
 }
-
-
-
 $headers = @{
-
     "Authorization" = "Bearer $token"
-
     "Content-Type"  = "application/json"
-
 }
-
 write-host $headers.Authorization
 
-
-
 try {
-
     $response = Invoke-RestMethod -Uri $uri -Method Put -Headers $headers -Body $body
-
     Write-Host "Security connector created successfully:"
-
     $response | ConvertTo-Json -Depth 10
-
 }
-
 catch {
-
     Write-Host "Error creating security connector:"
-
     Write-Host "Exception Type: $($_.Exception.GetType().FullName)"
-
     Write-Host "Exception Message: $($_.Exception.Message)"
 
     if ($_.Exception.Response) {
-
         $statusCode = [int]$_.Exception.Response.StatusCode
-
         Write-Host "Status Code: $statusCode"
-
         $responseBody = $_.ErrorDetails.Message
-
         if ($responseBody) {
-
             Write-Host "Response Body: $responseBody"
-
         }
-
     }
-
 }
-
-
-
 Write-Host "Verifying permissions and access..."
 
 try {
-
     $resources = Get-AzResource -ResourceGroupName $ResourceGroup
-
     Write-Host "Successfully listed resources in the resource group. Basic access confirmed."
-
     $resources | Format-Table Name, ResourceType -AutoSize
-
 }
-
 catch {
-
     Write-Host "Error listing resources in the resource group:"
-
     Write-Host $_.Exception.Message
-
 }
-
-
 
 Write-Host "Script execution completed."
