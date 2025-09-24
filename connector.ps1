@@ -67,54 +67,37 @@ $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroup
 Write-Log "Constructed URI: $uri"
 
 $bodyObj = @{
-    location = "uksouth"
-    properties = @{
-        hierarchyIdentifier = $ManagementProjectNumber
-        environmentName = "GCP"
-        environmentData = @{
-                environmentType = "GcpProject"
-                gcpProjectData = @{
-                    projectDetails = @{
-                        projectId = $ManagementProjectNumber
-                        workloadIdentityPoolId = $WORKLOAD_POOL_ID
-                        workloadIdentityProviderId = "gcp-provider-for-cloud-connector"
-                    }
-                }
-        }
-        offerings = @(
-            @{
-                offeringType = "CspmMonitorGcp"
-                nativeCloudConnection = @{
-                    serviceAccountEmailAddress = "microsoft-defender-cspm@$ManagementProjectNumber.iam.gserviceaccount.com"
-                    workloadIdentityProviderId = "cspm"
-                }
-            },
-            @{
-                offeringType = "DefenderForServersGcp"
-                defenderForServers = @{
-                    serviceAccountEmailAddress = "microsoft-defender-for-servers@$ManagementProjectNumber.iam.gserviceaccount.com"
-                    workloadIdentityProviderId = "defender-for-servers"
-                }
-                mdeAutoProvisioning = @{
-                    enabled = $true
-                    configuration = @{}
-                }
-                arcAutoProvisioning = @{
-                    enabled = $true
-                    configuration = @{}
-                }
-                vmScanners = @{
-                    enabled = $true
-                    configuration = @{
-                        cloudRoleArn = "projects/$GCPProjectNumber/serviceAccounts/microsoft-defender-agentless@$ManagementProjectNumber.iam.gserviceaccount.com"
-                        scanningMode = "Default"
-                        exclusionTags = @{}
-                    }
-                }
-                subPlan = "P2"
-            }
-        )
-    }
+  location   = $location
+  kind       = "Gcp"
+  properties = @{
+    environmentName     = "GCP"
+    hierarchyIdentifier = "folders/$GCPFolderId"
+    environmentData     = @{
+      environmentType = "GcpFolder"
+      folderDetails   = @{
+        folderId = "$GCPFolderId"
+      }
+      projectDetails = @{
+        projectId     = "$ManagementProjectId"
+        projectNumber = "$ManagementProjectNumber"
+      }
+      organizationalData = @{
+        organizationMembershipType  = "Organization"
+        serviceAccountEmailAddress  = "microsoft-defender-cspm@sbx-sentinel-mde-dev.iam.gserviceaccount.com"
+        workloadIdentityProviderId  = "projects/$ManagementProjectNumber/locations/global/workloadIdentityPools/117249f6e24734b8bb691a16a81e/providers/cspm"
+        excludedProjectNumbers      = @()
+      }
+    }
+    offerings = @(
+      @{
+        offeringType = "CspmMonitorGcp"
+        nativeCloudConnection = @{
+          serviceAccountEmailAddress = "microsoft-defender-cspm@sbx-sentinel-mde-dev.iam.gserviceaccount.com"
+          workloadIdentityProviderId = "projects/$ManagementProjectNumber/locations/global/workloadIdentityPools/117249f6e24734b8bb691a16a81e/providers/cspm"
+        }
+      }
+    )
+  }
 }
 
 $body = $bodyObj | ConvertTo-Json -Depth 10
