@@ -31,7 +31,7 @@ Set-AzContext -Subscription $SubscriptionId
 $apiVersion = "2024-03-01-preview"
 $securityConnectorName = "gcp-folder-test-connector"
 $location = "uksouth"
-$uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$securityConnectorName?api-version=$apiVersion"
+$uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Security/securityConnectors/$securityConnectorName`?api-version=$apiVersion"
 
 # Minimal request body (only CSPM offering)
 $bodyObj = @{
