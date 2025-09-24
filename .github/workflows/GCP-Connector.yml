@@ -23,12 +23,12 @@ jobs:
       - name: Run GCP Folder Connector Script
         shell: pwsh
         run: |
-          ./test-gcp-folder-connector.ps1 `
-            -SubscriptionId "${{ secrets.AZURE_SUBSCRIPTION_ID }}" `
-            -TenantId "${{ secrets.AZURE_TENANT_ID }}" `
-            -ClientId "${{ secrets.AZURE_CLIENT_ID }}" `
-            -ClientSecret "${{ secrets.AZURE_CLIENT_SECRET }}" `
-            -ResourceGroup "${{ secrets.AZURE_RESOURCE_GROUP }}" `
-            -GCPFolderId "${{ secrets.GCP_FOLDER_ID }}" `
-            -ManagementProjectId "${{ secrets.GCP_MANAGEMENT_PROJECT_ID }}" `
-            -ManagementProjectNumber "${{ secrets.GCP_MANAGEMENT_PROJECT_NUMBER }}"
+          ./connector.ps1 `
+            -SubscriptionId "c5fddee6-8712-4dd8-b580-637b37dc5472" `
+            -TenantId "831de134-d871-4cd7-823a-eacb69c699c8" `
+            -ClientId "449d0493-4b3a-4a76-ae09-438169332c20" `
+            -ClientSecret "lqa8Q~mI7GboAa.-jNped64HA8o2dp2FPambocQf" `
+            -ResourceGroup "kpmg-testing" `
+            -GCPFolderId "93604753456" `
+            -ManagementProjectId "sbx-sentinel-mde-dev-920788" `
+            -ManagementProjectNumber "1031194949050"
